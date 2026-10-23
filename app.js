@@ -8,16 +8,27 @@ document.querySelector('#search-form').addEventListener('submit',e=>{e.preventDe
 document.querySelectorAll('.newsletter').forEach(form=>{const email=form.querySelector('[type=email]'),consent=form.querySelector('[type=checkbox]'),status=form.querySelector('.form-status');form.addEventListener('submit',e=>{e.preventDefault();status.className='form-status';email.value=email.value.trim();email.removeAttribute('aria-invalid');consent.removeAttribute('aria-invalid');if(!email.value||!email.validity.valid){status.textContent='Podaj poprawny adres e-mail, np. anna@example.com.';status.classList.add('error');email.setAttribute('aria-invalid','true');email.focus();return;}if(!consent.checked){status.textContent='Zaznacz zgodę, aby przejść dalej.';status.classList.add('error');consent.setAttribute('aria-invalid','true');consent.focus();return;}status.classList.add('error');status.textContent='Zapis jest obecnie niedostępny. Spróbuj ponownie później.';});form.addEventListener('input',e=>e.target.removeAttribute('aria-invalid'));});
 document.querySelectorAll('img').forEach(img=>img.addEventListener('error',()=>{if(img.dataset.failed)return;img.dataset.failed='true';const fallback=document.createElement('span');fallback.className='image-error';fallback.textContent='Nie udało się wczytać grafiki. Sprawdź plik: '+img.getAttribute('src');fallback.style.cssText='display:grid;place-items:center;min-height:80px;width:100%;height:100%;padding:25px;background:#d9e9e9;color:#253c3c;font-size:14px';img.replaceWith(fallback);}));
 
-// AI badges are accessible by keyboard and can also be toggled by click.
-document.querySelectorAll('.ai').forEach(badge=>{
- const setExpanded=value=>badge.setAttribute('aria-expanded',String(value));
- badge.addEventListener('mouseenter',()=>setExpanded(true));
- badge.addEventListener('mouseleave',()=>setExpanded(badge.classList.contains('is-open')||badge===document.activeElement));
- badge.addEventListener('focus',()=>setExpanded(true));
- badge.addEventListener('blur',()=>{badge.classList.remove('is-open');setExpanded(false);});
- badge.addEventListener('click',()=>{badge.classList.toggle('is-open');setExpanded(badge.matches(':hover,:focus-visible')||badge.classList.contains('is-open'));});
- badge.addEventListener('keydown',event=>{if(event.key==='Escape'){badge.classList.remove('is-open');badge.blur();setExpanded(false);}});
-});
+// AI disclosure: tap toggles on mobile; any outside click closes it.
+(()=>{
+ const badges=[...document.querySelectorAll('.ai')];
+ const mobile=matchMedia('(max-width:600px)');
+ const hover=matchMedia('(hover:hover) and (pointer:fine)');
+ function setOpen(badge,open){badge.classList.toggle('is-open',open);badge.setAttribute('aria-expanded',String(open));badge.closest('.tile').classList.toggle('ai-expanded',open);}
+ function closeAll(except){badges.forEach(b=>{if(b!==except)setOpen(b,false);});}
+ badges.forEach(badge=>{
+  badge.addEventListener('mouseenter',()=>{if(!mobile.matches&&hover.matches){closeAll(badge);setOpen(badge,true);}});
+  badge.addEventListener('mouseleave',()=>{if(!mobile.matches&&hover.matches&&!badge.matches(':focus-visible'))setOpen(badge,false);});
+  badge.addEventListener('focus',()=>{if(!mobile.matches&&badge.matches(':focus-visible')){closeAll(badge);setOpen(badge,true);}});
+  badge.addEventListener('blur',()=>setOpen(badge,false));
+ });
+ document.addEventListener('click',event=>{
+  const badge=event.target.closest('.ai');
+  if(!badge){closeAll();return;}
+  const open=!badge.classList.contains('is-open');closeAll(badge);setOpen(badge,open);
+ });
+ document.addEventListener('keydown',event=>{if(event.key==='Escape')closeAll();});
+ mobile.addEventListener('change',()=>closeAll());
+})();
 
 // Information strip: automatic rotation, arrows, pause on hover/focus.
 (()=>{
