@@ -1,0 +1,46 @@
+'use strict';
+(()=>{
+ const data=window.BLACK_WEEKS_DATA,groups=[...document.querySelectorAll('[data-product-group]')];if(!groups.length)return;
+ const money=new Intl.NumberFormat('pl-PL',{style:'currency',currency:'PLN'}),sort=document.querySelector('#bw-sort'),count=document.querySelector('#bw-count');
+ let query='';
+ const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+ const validPrice=value=>typeof value==='number'&&Number.isFinite(value)&&value>0;
+ const safeUrl=value=>{if(typeof value!=='string'||!value.trim())return '';try{const url=new URL(value,location.href);return ['https:','http:'].includes(url.protocol)||(url.protocol==='file:'&&/^[a-zA-Z0-9_./-]+\.html(?:[?#].*)?$/.test(value))?value:'';}catch{return '';}};
+ const icon='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 17h16M6 13l4-5 4 3 4-6"/><circle cx="6" cy="6" r="1"/></svg>';
+ if(!data||!Array.isArray(data.products)){groups.forEach(g=>g.textContent='Nie udało się wczytać ofert. Odśwież stronę lub skontaktuj się z nami.');return;}
+ function card(p){
+  const reference=validPrice(p.lowest30),priced=validPrice(p.price)&&reference,discount=priced&&reference&&p.price<p.lowest30?Math.floor((1-p.price/p.lowest30)*100):0,url=safeUrl(p.url),features=(p.features||[]).slice(0,3);
+  return `<article class="bw-card" aria-labelledby="title-${esc(p.id)}"><div class="bw-card-media"><span class="bw-offer-label">BLACK WEEKS</span>${discount>0?`<span class="bw-discount">−${discount}%</span>`:''}<img src="${esc(p.image)}" data-fallback="${esc(p.fallback)}" alt="${esc(p.name)}" loading="lazy" width="1200" height="1200"></div><div class="bw-card-info"><p class="bw-card-brand">MOTUS</p><div class="bw-card-title-row"><h3 id="title-${esc(p.id)}">${esc(p.name)}</h3><span class="bw-price${priced?'':' pending'}">${priced?esc(money.format(p.price)):'Cena wkrótce'}</span></div><p class="bw-card-tagline">${esc(p.tagline)}</p>${reference?`<p class="bw-price-reference">Najniższa cena z 30 dni przed obniżką: <strong>${esc(money.format(p.lowest30))}</strong></p>`:''}</div><ul class="bw-card-features" aria-label="Wybrane parametry">${features.map(f=>`<li>${icon}<span><strong>${esc(f.value)}</strong><small>${esc(f.label)}</small></span></li>`).join('')}</ul><div class="bw-card-action">${url?`<a href="${esc(url)}" aria-label="Zobacz ${esc(p.name)}">Zobacz model <span aria-hidden="true">↗</span></a>`:`<button type="button" data-offer-id="${esc(p.id)}" aria-label="Zobacz szczegóły ${esc(p.name)}">Zobacz model <span aria-hidden="true">↗</span></button>`}</div></article>`;
+ }
+ function order(items){const mode=sort.value;return [...items].sort((a,b)=>{if(mode==='name')return a.name.localeCompare(b.name,'pl');if(mode.startsWith('price')){if(!validPrice(a.price))return validPrice(b.price)?1:0;if(!validPrice(b.price))return -1;return mode==='price-up'?a.price-b.price:b.price-a.price;}return 0;});}
+ function render(){let total=0;groups.forEach(group=>{const items=order(data.products.filter(p=>p.category===group.dataset.productGroup&&p.name.toLocaleLowerCase('pl').includes(query)));total+=items.length;group.innerHTML=items.length?items.map(card).join(''):'<p class="bw-empty">Brak modeli pasujących do wyszukiwania.<br><button type="button" data-clear-search>Pokaż wszystkie modele</button></p>';group.querySelectorAll('img').forEach(img=>{img.addEventListener('error',()=>{if(img.dataset.fallback){const fallback=img.dataset.fallback;delete img.dataset.fallback;img.src=fallback;}else{img.style.visibility='hidden';}},{passive:true});});});count.replaceChildren(document.createTextNode(`${total} ${total===1?'model':total>1&&total<5?'modele':'modeli'}${query?' · „'+query+'”':''}`));if(query){const clear=document.createElement('button');clear.type='button';clear.className='bw-clear-search';clear.dataset.clearSearch='';clear.textContent='Wyczyść wyszukiwanie';count.append(clear);}setupCarousels();}
+ function setupCarousels(){
+  document.querySelectorAll('[data-carousel]').forEach(wrap=>{
+   const track=wrap.querySelector('[data-product-group]'),prev=wrap.querySelector('.bw-carousel-prev'),next=wrap.querySelector('.bw-carousel-next'),status=wrap.querySelector('.bw-carousel-status');
+   const update=()=>{const cards=track.querySelectorAll('.bw-card'),total=cards.length;if(!total){status.textContent='';prev.disabled=next.disabled=true;return;}const first=cards[0],step=first.getBoundingClientRect().width+parseFloat(getComputedStyle(track).gap||0),start=Math.round(track.scrollLeft/step)+1,shown=Math.max(1,Math.round((track.clientWidth+parseFloat(getComputedStyle(track).gap||0))/step));status.textContent=`${start}–${Math.min(total,start+shown-1)} z ${total}`;prev.disabled=track.scrollLeft<3;next.disabled=track.scrollLeft+track.clientWidth>=track.scrollWidth-3;};
+   if(!wrap.dataset.bound){wrap.dataset.bound='true';const move=direction=>track.scrollBy({left:direction*(track.clientWidth+parseFloat(getComputedStyle(track).gap||0)),behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'instant':'smooth'});prev.addEventListener('click',()=>move(-1));next.addEventListener('click',()=>move(1));track.addEventListener('scroll',update,{passive:true});track.addEventListener('keydown',e=>{if(e.target!==track)return;if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();move(e.key==='ArrowRight'?1:-1);}});wrap.querySelector('.bw-see-all').addEventListener('click',()=>{const toast=document.querySelector('.toast');toast.textContent='Pełna lista ofert będzie dostępna wkrótce.';toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),3000);});if('ResizeObserver'in window)new ResizeObserver(update).observe(track);}
+   track.scrollLeft=0;requestAnimationFrame(update);
+  });
+ }
+ window.searchBlackWeeks=term=>{query=term.trim().toLocaleLowerCase('pl');render();if(query)document.querySelector('.bw-shopping-tools').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'instant':'smooth',block:'start'});};
+ sort.addEventListener('change',render);
+ document.addEventListener('click',event=>{if(event.target.closest('[data-clear-search]')){query='';document.querySelector('#search-form input').value='';render();}const button=event.target.closest('[data-offer-id]');if(button){const p=data.products.find(p=>p.id===button.dataset.offerId);if(p){const price=validPrice(p.price)?money.format(p.price):'Cena zostanie podana po potwierdzeniu oferty.';showInfo(p.name,`${p.tagline} ${p.features.map(f=>f.label+': '+f.value).join(' · ')}. ${price} O szczegóły modelu zapytaj: sklep@motus.pl.`);}}});
+ const campaign=data.campaign||{},date=value=>{if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return null;const d=new Date(value+'T12:00:00');return Number.isNaN(d.valueOf())?null:d;},start=date(campaign.startDate),end=date(campaign.endDate);
+ if(start&&end&&start<=end){const fmt=new Intl.DateTimeFormat('pl-PL',{day:'numeric',month:'long',year:'numeric'}),text=`Akcja trwa od ${fmt.format(start)} do ${fmt.format(end)}.`;const dates=document.querySelector('#bw-dates');dates.textContent=text;dates.hidden=false;document.querySelector('#bw-duration').textContent=text;}
+ document.querySelectorAll('[data-campaign-link]').forEach(a=>{const url=safeUrl(campaign[a.dataset.campaignLink]);if(url){a.href=url;a.hidden=false;}});
+ const header=document.querySelector('header');if('ResizeObserver'in window)new ResizeObserver(entries=>{document.documentElement.style.setProperty('--bw-header-height',Math.ceil(entries[0].target.getBoundingClientRect().height)+'px');}).observe(header);
+ const anchors=[...document.querySelectorAll('.bw-category-nav a')];
+ if('IntersectionObserver'in window){const observer=new IntersectionObserver(entries=>{const visible=entries.filter(e=>e.isIntersecting).sort((a,b)=>a.boundingClientRect.top-b.boundingClientRect.top);if(!visible.length)return;const id=visible[0].target.id;anchors.forEach(a=>{const active=a.getAttribute('href')==='#'+id;a.classList.toggle('is-active',active);if(active)a.setAttribute('aria-current','location');else a.removeAttribute('aria-current');});},{rootMargin:'-20% 0px -55% 0px',threshold:0});document.querySelectorAll('.bw-product-section').forEach(section=>observer.observe(section));}
+ render();
+})();
+
+
+// Pointer highlight affects only the decorative percentage layer, never content.
+(()=>{
+ const page=document.body;if(!page?.classList.contains('bw-page'))return;
+ const fine=matchMedia('(hover:hover) and (pointer:fine)');let frame=0,x=-500,y=-500;
+ function hide(){if(frame){cancelAnimationFrame(frame);frame=0;}page.classList.remove('has-pattern-pointer');}
+ function paint(){frame=0;page.style.setProperty('--bw-pointer-x',x+'px');page.style.setProperty('--bw-pointer-y',y+'px');page.classList.add('has-pattern-pointer');}
+ document.addEventListener('pointermove',event=>{if(!fine.matches||event.pointerType==='touch')return;x=event.clientX;y=event.clientY;if(!frame)frame=requestAnimationFrame(paint);},{passive:true});
+ document.documentElement.addEventListener('pointerleave',hide);window.addEventListener('blur',hide);document.addEventListener('visibilitychange',()=>{if(document.hidden)hide();});fine.addEventListener('change',hide);
+})();
