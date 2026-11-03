@@ -1,8 +1,8 @@
 /* Ceny i linki uzupełnij przed publikacją. Daytona 04–06: miejsca do uzupełnienia. */
 window.BLACK_WEEKS_DATA = {
   "campaign": {
-    "startDate": null,
-    "endDate": null,
+    "startDate": "2026-11-06",
+    "endDate": "2026-11-30",
     "termsUrl": "",
     "shippingUrl": "",
     "returnsUrl": ""
